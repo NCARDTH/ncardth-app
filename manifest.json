@@ -1,0 +1,16 @@
+{
+  "name": "N'CARD — TCG Pre-Grade",
+  "short_name": "N'CARD",
+  "description": "Simulated pre-grading tool for trading cards: perspective correction, centering measurement, and front/back card check export.",
+  "start_url": "./NCARD.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b0e14",
+  "theme_color": "#0b0e14",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
