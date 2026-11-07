@@ -371,6 +371,79 @@
   @media (min-width:1400px) and (orientation:landscape){
     .phone{padding-left:32px;padding-right:32px;}
   }
+
+  /* ============================================================
+     DESKTOP / LARGE TABLET LANDSCAPE — balanced centered layout
+     One centered unit:   [ logo ............................ PRO ]
+                          [ Front | Back ]   [ controls panel     ]
+                          [    CARD      ]   [  (same height)     ]
+     The card column is exactly as wide as the card, so the tabs line
+     up with it and no empty bands are left on either side.
+     ============================================================ */
+  @media (orientation:landscape) and (min-width:1024px) and (min-height:640px){
+    :root{
+      --hdrH:72px; --tabsH:50px; --padY:24px; --gapX:clamp(24px,3vw,48px);
+      --panelW:clamp(340px, 26vw, 420px);
+      --stageH:calc(var(--vh) - var(--hdrH) - var(--tabsH) - var(--padY)*2 - var(--sat) - var(--sab));
+      --stageW:min(calc(var(--stageH) * 63 / 88), calc(100vw - var(--panelW) - var(--gapX) - 64px));
+    }
+    body{
+      background:radial-gradient(1200px 800px at 30% 0%, #141b2e 0%, var(--bg) 60%);
+    }
+    .phone{
+      background:transparent;
+      height:var(--vh);
+      padding:calc(var(--padY) + var(--sat)) 32px calc(var(--padY) + var(--sab));
+      grid-template-columns:var(--stageW) var(--panelW);
+      grid-template-rows:var(--hdrH) var(--tabsH) minmax(0,1fr);
+      grid-template-areas:
+        "header header"
+        "tabs   controls"
+        "stage  controls";
+      justify-content:center;
+      column-gap:var(--gapX);
+    }
+    header.app-header{padding:0 2px 12px;align-items:center;}
+    .brand-logo{height:56px;}
+    .pro-pill{font-size:11px;padding:5px 12px;}
+    .tabs{padding:0 0 12px;}
+    .tab{padding:9px 0;font-size:13px;}
+    .stage-wrap{padding:0;align-items:flex-start;}
+    .stage{width:100%;height:auto;max-height:100%;border-radius:22px;}
+
+    .controls{
+      grid-row:2 / -1;
+      align-self:stretch;
+      background:linear-gradient(180deg, rgba(255,255,255,.025), rgba(255,255,255,.01));
+      border:1px solid var(--border);
+      border-radius:22px;
+      padding:18px 18px 10px;
+      display:flex;flex-direction:column;
+    }
+    .controls > .row:first-of-type{margin-bottom:12px;}
+    .btn{white-space:nowrap;font-size:13px;padding:11px 8px;}
+    .section-title{margin:14px 2px 8px;}
+    .status{margin:14px 0 4px;text-align:left;}
+
+    /* Front / Back previews sit side by side, compact */
+    .thumbs{max-width:none;width:100%;gap:12px;margin-top:12px;justify-content:center;}
+    .thumb{flex:0 0 auto;height:clamp(110px, 17vh, 210px);width:auto;aspect-ratio:63/88;}
+
+    /* Last row: Export gets its own full-width line, Reset/Share below */
+    .row:has(#exportBtn){flex-wrap:wrap;margin-top:12px !important;margin-bottom:0;}
+    .row:has(#exportBtn) #exportBtn{order:-1;flex:1 1 100%;padding:13px 8px;font-size:14px;}
+
+    /* push the export block + disclaimer to the bottom of the panel */
+    .thumbs{margin-top:auto;padding-top:12px;}
+    .controls::after{padding:10px 4px 0;}
+    .controls{padding-bottom:12px;}
+  }
+  /* Browsers without :has() — keep the export row readable */
+  @supports not selector(:has(*)){
+    @media (orientation:landscape) and (min-width:1024px) and (min-height:640px){
+      .btn{font-size:12px;}
+    }
+  }
 </style>
 </head>
 <body>
