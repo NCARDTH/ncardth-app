@@ -2,7 +2,7 @@
 // Strategy: stale-while-revalidate. The app shell is a single self-contained
 // HTML file (all images/fonts are inlined as base64), so caching just this
 // handful of files is enough for the whole app to work offline.
-const CACHE_NAME = 'ncard-cache-v2';
+const CACHE_NAME = 'ncard-cache-v3';
 const APP_SHELL = [
   './',
   './index.html',
@@ -37,6 +37,25 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
+  // Pages (HTML): network first, so a new upload shows up on the very next
+  // open; fall back to the cached copy when offline.
+  const isPage = event.request.mode === 'navigate' || url.pathname.endsWith('.html') || url.pathname.endsWith('/');
+  if(isPage){
+    event.respondWith(
+      fetch(event.request, {cache:'no-store'})
+        .then((response) => {
+          if(response && response.ok){
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then((c) => c || caches.match('./NCARD.html')))
+    );
+    return;
+  }
+
+  // Everything else (icons, manifest): stale-while-revalidate.
   event.respondWith(
     caches.open(CACHE_NAME).then((cache) =>
       cache.match(event.request).then((cached) => {
@@ -45,7 +64,7 @@ self.addEventListener('fetch', (event) => {
             if (response && response.ok) cache.put(event.request, response.clone());
             return response;
           })
-          .catch(() => cached); // offline: fall back to whatever we have cached
+          .catch(() => cached);
         return cached || networkFetch;
       })
     )

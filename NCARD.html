@@ -455,6 +455,9 @@
     -webkit-user-drag:none;
   }
   .stage img, .stage video{pointer-events:none;}
+
+  /* No long-press save/copy popups on any image in the app (logo, previews) */
+  img{-webkit-touch-callout:none;-webkit-user-drag:none;}
 </style>
 </head>
 <body>
@@ -1952,6 +1955,16 @@
   ['contextmenu','selectstart','dragstart'].forEach(evt=>{
     stage.addEventListener(evt, e=>e.preventDefault());
   });
+  // iPad / iPhone Safari: its long-press image menu ("Save to Photos",
+  // "Copy Subject", Live Text…) is driven by the native touch gesture and
+  // ignores the CSS/contextmenu blocks above. Cancelling touchstart inside
+  // the card area stops Safari from ever starting that gesture. All dragging
+  // here uses Pointer Events, which still fire normally, and nothing inside
+  // the card relies on click — so measuring is unaffected.
+  const swallowTouch = e => { if(e.cancelable) e.preventDefault(); };
+  stage.addEventListener('touchstart', swallowTouch, {passive:false});
+  stage.addEventListener('touchmove',  swallowTouch, {passive:false});
+  ['gesturestart','gesturechange'].forEach(evt=> stage.addEventListener(evt, swallowTouch, {passive:false}));
 
   // Full-screen layout: the card area changes size on rotate / window resize.
   // Overlays are in %, but pan offsets are in px — rescale them so the image
