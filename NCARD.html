@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
 <title>N'CARD — TCG Pre-Grade</title>
 
 <!-- PWA: installable "Add to Home Screen" + offline app shell -->
@@ -257,6 +257,120 @@
   input[type=file]{display:none;}
 
   footer{text-align:center;padding:16px 4px 4px;font-size:10px;color:#4a5268;}
+
+  /* ============================================================
+     FULL-SCREEN RESPONSIVE LAYOUT
+     Drops the old "phone mockup" frame and fills the whole screen on
+     every device. Phones (portrait): single column, card on top.
+     Landscape phones / tablets / desktops: card on the left sized to
+     the screen height, controls in a scrolling side panel on the right.
+     ============================================================ */
+  :root{
+    --sat:env(safe-area-inset-top,0px);
+    --sab:env(safe-area-inset-bottom,0px);
+    --sal:env(safe-area-inset-left,0px);
+    --sar:env(safe-area-inset-right,0px);
+    --vh:100vh;
+  }
+  @supports (height:100dvh){ :root{ --vh:100dvh; } }
+
+  body{
+    display:block;
+    min-height:var(--vh);
+    padding:0;
+    background:var(--bg);
+  }
+  .phone{
+    width:100%;max-width:none;min-height:var(--vh);
+    margin:0;border:0;border-radius:0;box-shadow:none;
+    padding:calc(8px + var(--sat)) calc(10px + var(--sar)) calc(10px + var(--sab)) calc(10px + var(--sal));
+  }
+  .notch{display:none;}
+  .brand-logo{height:clamp(48px, 9vh, 88px);}
+  header.app-header{padding:2px 6px 10px;}
+
+  /* Bigger touch targets for drag handles on touch screens */
+  @media (pointer:coarse){
+    .corner-handle{width:28px;height:28px;}
+    .ib-edge.horiz,.edge-handle.horiz{width:42px;height:11px;}
+    .ib-edge.vert,.edge-handle.vert{width:11px;height:42px;}
+  }
+
+  /* ---------- Portrait (phones & tablets upright) ---------- */
+  @media (orientation:portrait){
+    /* Keep the whole card visible on screen; leftover width is centered. */
+    .stage{
+      max-width:calc((var(--vh) - var(--sat) - var(--sab) - 190px) * 63 / 88);
+      min-width:min(260px, 100%);
+    }
+    .controls, footer{max-width:680px;margin-left:auto;margin-right:auto;}
+    .tabs{max-width:680px;margin:0 auto;}
+  }
+
+  /* Small phones (iPhone SE, mini Android) */
+  @media (max-width:360px){
+    .btn{font-size:11.5px;padding:10px 4px;}
+    .chip{font-size:10px;}
+    .ratio-chip .v{font-size:13px;}
+  }
+
+  /* ---------- Two-column: landscape phones, tablets, desktop ---------- */
+  @media (orientation:landscape) and (min-width:560px), (min-width:1000px) and (min-aspect-ratio:4/5){
+    html,body{height:var(--vh);overflow:hidden;}
+    .phone{
+      height:var(--vh);min-height:0;
+      display:grid;
+      grid-template-columns:minmax(0,1fr) clamp(300px, 34vw, 460px);
+      grid-template-rows:auto auto minmax(0,1fr);
+      grid-template-areas:
+        "header controls"
+        "tabs   controls"
+        "stage  controls";
+      column-gap:clamp(12px, 2vw, 28px);
+    }
+    header.app-header{grid-area:header;}
+    .tabs{grid-area:tabs;max-width:none;}
+    .stage-wrap{
+      grid-area:stage;min-height:0;
+      display:flex;align-items:center;justify-content:center;
+      padding-bottom:4px;
+    }
+    .stage{
+      height:100%;width:auto;max-width:100%;
+      max-height:100%;min-width:0;
+    }
+    .controls{
+      grid-area:controls;
+      grid-row:1 / -1;
+      overflow-y:auto;overscroll-behavior:contain;
+      -webkit-overflow-scrolling:touch;
+      max-width:none;margin:0;
+      padding:4px 4px 8px;
+      scrollbar-width:thin;scrollbar-color:var(--border) transparent;
+    }
+    footer{display:none;}
+    .controls::after{
+      content:"N'CARD — simulated pre-grade tool, not an official grading service";
+      display:block;text-align:center;padding:14px 4px 4px;font-size:10px;color:#4a5268;
+    }
+    .thumbs{max-width:300px;margin-left:auto;margin-right:auto;}
+  }
+
+  /* Short landscape screens (phones on their side): compact header */
+  @media (orientation:landscape) and (max-height:520px){
+    .brand-logo{height:34px;}
+    header.app-header{padding:0 4px 6px;}
+    .tabs{padding:0 4px 6px;}
+    .tab{padding:6px 0;}
+    .section-title{margin:8px 2px 4px;}
+    .row{margin-bottom:8px;}
+    .btn{padding:9px 6px;}
+  }
+
+  /* Large desktop: a bit more breathing room */
+  @media (min-width:1400px) and (orientation:landscape){
+    .phone{padding-left:32px;padding-right:32px;}
+  }
 </style>
 </head>
 <body>
@@ -1721,6 +1835,25 @@
   function updateStatus(){
     // no-op placeholder for tab-specific hints
   }
+
+  // Full-screen layout: the card area changes size on rotate / window resize.
+  // Overlays are in %, but pan offsets are in px — rescale them so the image
+  // stays in the same place relative to the card.
+  (function(){
+    let lastW = stage.getBoundingClientRect().width;
+    const onResize = () => {
+      const w = stage.getBoundingClientRect().width;
+      if(w > 0 && lastW > 0 && Math.abs(w-lastW) > 0.5){
+        const k = w / lastW;
+        panX *= k; panY *= k;
+        clampPanToBounds();
+        applyMediaTransform();
+      }
+      if(w > 0) lastW = w;
+    };
+    if('ResizeObserver' in window) new ResizeObserver(onResize).observe(stage);
+    else window.addEventListener('resize', onResize);
+  })();
 
   renderGuides();
   setFlowStage('empty');
