@@ -163,10 +163,10 @@
   .persp-guide-h, .persp-guide-v{
     position:absolute;pointer-events:none;display:none;z-index:15;
   }
-  .persp-guide-h{ left:0;right:0;height:0;border-top:2px dashed rgba(255,255,255,.85); }
-  .persp-guide-v{ top:0;bottom:0;width:0;border-left:2px dashed rgba(255,255,255,.85); }
+  .persp-guide-h{ left:0;right:0;height:0;border-top:2px dashed rgba(255,255,255,.85);transform:translateY(-1px); }
+  .persp-guide-v{ top:0;bottom:0;width:0;border-left:2px dashed rgba(255,255,255,.85);transform:translateX(-1px); }
   .persp-loupe{
-    position:absolute;width:110px;height:110px;border-radius:50%;
+    position:absolute;width:187px;height:187px;border-radius:50%;
     border:3px solid var(--accent);box-shadow:0 4px 18px rgba(0,0,0,.55);
     background-repeat:no-repeat;pointer-events:none;display:none;z-index:20;
     overflow:hidden;
@@ -707,10 +707,12 @@
   // ---------- Guide render ----------
   function renderGuides(){
     const r = state.inner;
-    innerGuide.style.left = r.x+'%';
-    innerGuide.style.top = r.y+'%';
-    innerGuide.style.width = r.w+'%';
-    innerGuide.style.height = r.h+'%';
+    // The 2px border is centred on the true edge (1px each side), so what
+    // you see lines up exactly with the value used for the measurement.
+    innerGuide.style.left = 'calc('+r.x+'% - 1px)';
+    innerGuide.style.top = 'calc('+r.y+'% - 1px)';
+    innerGuide.style.width = 'calc('+r.w+'% + 2px)';
+    innerGuide.style.height = 'calc('+r.h+'% + 2px)';
     // ib-edge bars sit at the midpoint of each of the rectangle's own 4 sides
     // (positioned relative to innerGuide itself, which is already sized/
     // positioned above) so dragging one bar resizes just that one edge.
@@ -725,6 +727,17 @@
   }
 
   function clamp(v,min,max){ return Math.max(min,Math.min(max,v)); }
+
+  // Exact inner box of the card area. The stage has a 1px border, but the
+  // photo and every overlay are laid out inside it, so all %/px maths must
+  // use this box — not getBoundingClientRect(), which includes the border.
+  function stageBox(){
+    const r = stage.getBoundingClientRect();
+    const cs = getComputedStyle(stage);
+    const bl = parseFloat(cs.borderLeftWidth)||0, br = parseFloat(cs.borderRightWidth)||0;
+    const bt = parseFloat(cs.borderTopWidth)||0,  bb = parseFloat(cs.borderBottomWidth)||0;
+    return { left:r.left+bl, top:r.top+bt, width:r.width-bl-br, height:r.height-bt-bb };
+  }
 
   // ---------- Image transform (zoom + pan) helpers ----------
   // Unified math for both object-fit:cover (video) and object-fit:contain (photo).
@@ -763,7 +776,7 @@
   // the image further than its own edge (no runaway blank space).
   function getMaxPan(){
     if(!activeMediaEl) return {maxX:0,maxY:0};
-    const rect = stage.getBoundingClientRect();
+    const rect = stageBox();
     const {nw,nh} = getSourceSize(activeMediaEl);
     if(!nw || !nh) return {maxX:0,maxY:0};
     const mode = fitModeFor(activeMediaEl);
@@ -829,7 +842,7 @@
     // Inset the quad slightly from the raw photo's own displayed rect (not the
     // whole stage), so the starting guess hugs the actual image content even
     // when the raw photo is letterboxed (object-fit:contain) inside the stage.
-    const rect = stage.getBoundingClientRect();
+    const rect = stageBox();
     const {nw,nh} = getSourceSize(photo);
     if(!nw || !nh){
       return { tl:{x:10,y:8}, tr:{x:90,y:8}, br:{x:90,y:92}, bl:{x:10,y:92} };
@@ -871,7 +884,7 @@
     statusMsg.textContent = 'ลากมุมหรือลากเส้นขอบทั้ง 4 ด้าน ให้ตรงกับขอบการ์ดจริง แล้วกด Confirm';
   }
 
-  const LOUPE_SIZE = 110, LOUPE_ZOOM = 2.6;
+  const LOUPE_SIZE = 187, LOUPE_ZOOM = 2.6; // 110 → 187px (+70%); same zoom ⇒ 70% wider field of view
 
   // While dragging a perspective corner, show (1) a full-width/height dashed
   // crosshair through that exact point, so it's obvious where the corner
@@ -880,8 +893,10 @@
   // even on a small touch screen. Both work identically whichever side
   // (front/back) is currently being aligned, since this is the shared
   // perspective-stage code used for both captures.
+  const LOUPE_BORDER = 3;
+  const LOUPE_INNER = LOUPE_SIZE - LOUPE_BORDER*2; // background is drawn inside the ring
   function updatePerspAids(xPct, yPct){
-    const rect = stage.getBoundingClientRect();
+    const rect = stageBox();
     const px = xPct/100*rect.width, py = yPct/100*rect.height;
 
     perspGuideH.style.top = py+'px';
@@ -896,8 +911,8 @@
       // the aligned (Art Border) stage the user may have zoomed/panned.
       const d = computeDisplayRect(nw, nh, rect.width, rect.height, 'contain', zoom, panX, panY);
       const bgW = d.dispW*LOUPE_ZOOM, bgH = d.dispH*LOUPE_ZOOM;
-      const bgX = -((px-d.dispX)*LOUPE_ZOOM - LOUPE_SIZE/2);
-      const bgY = -((py-d.dispY)*LOUPE_ZOOM - LOUPE_SIZE/2);
+      const bgX = -((px-d.dispX)*LOUPE_ZOOM - LOUPE_INNER/2);
+      const bgY = -((py-d.dispY)*LOUPE_ZOOM - LOUPE_INNER/2);
       perspLoupe.style.backgroundImage = 'url('+photo.src+')';
       perspLoupe.style.backgroundSize = bgW+'px '+bgH+'px';
       perspLoupe.style.backgroundPosition = bgX+'px '+bgY+'px';
@@ -932,13 +947,17 @@
       e.preventDefault(); e.stopPropagation();
       lockPageScroll();
       const key = h.dataset.corner;
-      const rect = stage.getBoundingClientRect();
+      const rect = stageBox();
       try{ h.setPointerCapture(e.pointerId); }catch(err){}
+      // Remember where on the handle the finger landed, so the corner moves
+      // by exactly the finger's movement instead of snapping to the fingertip.
+      const offX = (e.clientX-rect.left) - pState[key].x/100*rect.width;
+      const offY = (e.clientY-rect.top)  - pState[key].y/100*rect.height;
       updatePerspAids(pState[key].x, pState[key].y);
       function onMove(ev){
         ev.preventDefault();
-        const x = clamp(((ev.clientX-rect.left)/rect.width)*100, 0, 100);
-        const y = clamp(((ev.clientY-rect.top)/rect.height)*100, 0, 100);
+        const x = clamp(((ev.clientX-rect.left-offX)/rect.width)*100, 0, 100);
+        const y = clamp(((ev.clientY-rect.top-offY)/rect.height)*100, 0, 100);
         pState[key] = {x,y};
         renderPerspective();
         updatePerspAids(x, y);
@@ -965,7 +984,7 @@
       lockPageScroll();
       const edge = el.dataset.edge;
       const [kA,kB] = EDGE_CORNERS[edge];
-      const rect = stage.getBoundingClientRect();
+      const rect = stageBox();
       try{ el.setPointerCapture(e.pointerId); }catch(err){}
       const startX = e.clientX, startY = e.clientY;
       const startA = {x:pState[kA].x, y:pState[kA].y};
@@ -1040,7 +1059,7 @@
     flattenBtn.disabled = true;
 
     // Convert the on-screen quad (stage %) into natural-photo pixel coords.
-    const rect = stage.getBoundingClientRect();
+    const rect = stageBox();
     const d = computeDisplayRect(nw,nh,rect.width,rect.height,'contain',1,0,0);
     function toNatural(pt){
       const stagePxX = pt.x/100*rect.width, stagePxY = pt.y/100*rect.height;
@@ -1077,17 +1096,19 @@
 
       for(let y=0;y<H;y++){
         for(let x=0;x<W;x++){
-          const denom = Hm.h31*x + Hm.h32*y + 1;
-          const sx = (Hm.h11*x + Hm.h12*y + Hm.h13)/denom;
-          const sy = (Hm.h21*x + Hm.h22*y + Hm.h23)/denom;
+          const cx = x+0.5, cy = y+0.5; // centre of the output pixel
+          const denom = Hm.h31*cx + Hm.h32*cy + 1;
+          const sx = (Hm.h11*cx + Hm.h12*cy + Hm.h13)/denom - 0.5; // back to pixel-index space
+          const sy = (Hm.h21*cx + Hm.h22*cy + Hm.h23)/denom - 0.5;
           const di = (y*W+x)*4;
-          if(sx<0 || sy<0 || sx>nw-1 || sy>nh-1 || !isFinite(sx) || !isFinite(sy)){
+          if(sx<-0.5 || sy<-0.5 || sx>nw-0.5 || sy>nh-0.5 || !isFinite(sx) || !isFinite(sy)){
             oPix[di]=5; oPix[di+1]=7; oPix[di+2]=12; oPix[di+3]=255;
             continue;
           }
-          const x0 = Math.floor(sx), y0 = Math.floor(sy);
+          const sxc = clamp(sx,0,nw-1), syc = clamp(sy,0,nh-1);
+          const x0 = Math.floor(sxc), y0 = Math.floor(syc);
           const x1 = Math.min(x0+1, nw-1), y1 = Math.min(y0+1, nh-1);
-          const fx = sx-x0, fy = sy-y0;
+          const fx = sxc-x0, fy = syc-y0;
           for(let ch=0; ch<4; ch++){
             const p00 = sPix[(y0*nw+x0)*4+ch], p10 = sPix[(y0*nw+x1)*4+ch];
             const p01 = sPix[(y1*nw+x0)*4+ch], p11 = sPix[(y1*nw+x1)*4+ch];
@@ -1161,17 +1182,21 @@
         e.preventDefault(); e.stopPropagation();
         lockPageScroll();
         const edge = el.dataset.ibedge;
-        const rect = stage.getBoundingClientRect();
+        const rect = stageBox();
         try{ el.setPointerCapture(e.pointerId); }catch(err){}
         const start = Object.assign({}, state.inner);
-        const startXPct = clamp((e.clientX-rect.left)/rect.width*100, 0, 100);
-        const startYPct = clamp((e.clientY-rect.top)/rect.height*100, 0, 100);
-        updatePerspAids(startXPct, startYPct);
+        // The line's true position when grabbed; the finger's offset from it
+        // is kept for the whole drag so the line never jumps to the fingertip.
+        const lineX0 = edge==='left' ? start.x : edge==='right' ? start.x+start.w : start.x+start.w/2;
+        const lineY0 = edge==='top'  ? start.y : edge==='bottom'? start.y+start.h : start.y+start.h/2;
+        const fx0 = (e.clientX-rect.left)/rect.width*100;
+        const fy0 = (e.clientY-rect.top)/rect.height*100;
+        updatePerspAids(lineX0, lineY0);
         function onMove(ev){
           ev.preventDefault();
           let r = Object.assign({}, start);
-          const xPct = clamp((ev.clientX-rect.left)/rect.width*100, 0, 100);
-          const yPct = clamp((ev.clientY-rect.top)/rect.height*100, 0, 100);
+          const xPct = clamp(lineX0 + ((ev.clientX-rect.left)/rect.width*100 - fx0), 0, 100);
+          const yPct = clamp(lineY0 + ((ev.clientY-rect.top)/rect.height*100 - fy0), 0, 100);
           if(edge==='left'){
             const nx = clamp(xPct, 0, start.x+start.w-MIN_INNER_SIZE);
             r.w = start.w - (nx-start.x);
@@ -1187,7 +1212,9 @@
           }
           state.inner = r;
           renderGuides();
-          updatePerspAids(xPct, yPct);
+          const ax = edge==='left' ? r.x : edge==='right' ? r.x+r.w : xPct;
+          const ay = edge==='top'  ? r.y : edge==='bottom'? r.y+r.h : yPct;
+          updatePerspAids(ax, ay);
         }
         function onUp(){
           unlockPageScroll();
@@ -1461,7 +1488,7 @@
   function snapshotLiveToRaw(){
     const {nw,nh} = getSourceSize(video);
     if(!nw || !nh) return;
-    const rectStage = stage.getBoundingClientRect();
+    const rectStage = stageBox();
     const w = CAPTURE_W, h = CAPTURE_H;
     const scaleFactor = w/rectStage.width;
     const panXc = panX*scaleFactor, panYc = panY*scaleFactor;
@@ -1601,7 +1628,7 @@
     // on-screen stage (same object-fit mode + zoom + pan), then let the canvas
     // bounds clip it — identical to how the browser renders object-fit +
     // transform, so nothing is stretched and nothing gets cut in half.
-    const stageRect = stage.getBoundingClientRect();
+    const stageRect = stageBox();
     const srcEl = activeMediaEl;
     const {nw,nh} = getSourceSize(srcEl);
     try{
@@ -1930,9 +1957,9 @@
   // Overlays are in %, but pan offsets are in px — rescale them so the image
   // stays in the same place relative to the card.
   (function(){
-    let lastW = stage.getBoundingClientRect().width;
+    let lastW = stageBox().width;
     const onResize = () => {
-      const w = stage.getBoundingClientRect().width;
+      const w = stageBox().width;
       if(w > 0 && lastW > 0 && Math.abs(w-lastW) > 0.5){
         const k = w / lastW;
         panX *= k; panY *= k;
