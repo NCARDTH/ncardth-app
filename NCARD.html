@@ -444,6 +444,17 @@
       .btn{font-size:12px;}
     }
   }
+
+  /* No "Save image" / text-select / drag-ghost popups while measuring.
+     A long-press on the card (e.g. while dragging the Centering / Art Border
+     lines) used to open the phone's save-image menu. The photo itself never
+     needs to receive touches — all drag logic listens on .stage. */
+  .stage, .stage *{
+    -webkit-touch-callout:none;
+    -webkit-user-select:none;user-select:none;
+    -webkit-user-drag:none;
+  }
+  .stage img, .stage video{pointer-events:none;}
 </style>
 </head>
 <body>
@@ -1908,6 +1919,12 @@
   function updateStatus(){
     // no-op placeholder for tab-specific hints
   }
+
+  // Block the long-press context menu ("Save image", "Copy", etc.),
+  // text selection and native image dragging anywhere on the card area.
+  ['contextmenu','selectstart','dragstart'].forEach(evt=>{
+    stage.addEventListener(evt, e=>e.preventDefault());
+  });
 
   // Full-screen layout: the card area changes size on rotate / window resize.
   // Overlays are in %, but pan offsets are in px — rescale them so the image
