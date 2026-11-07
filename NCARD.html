@@ -2013,28 +2013,55 @@
   // browsers without file-sharing support fall back to the classic download
   // link; if even that fails, the image opens in a new tab as a last resort
   // so it can still be saved manually (long-press / right-click).
-  async function saveOrShareImage(dataUrl, filename){
-    let file = null;
+  async function dataUrlToFile(dataUrl, filename){
     try{
       const blob = await (await fetch(dataUrl)).blob();
-      file = new File([blob], filename, {type:'image/jpeg'});
-    }catch(err){ file = null; }
+      return new File([blob], filename, {type:'image/jpeg'});
+    }catch(err){ return null; }
+  }
 
-    if(file && navigator.canShare && navigator.canShare({files:[file]})){
-      try{
-        await navigator.share({ files:[file], title:"N'CARD Pre-Grade Result" });
-      }catch(err){ /* user cancelled the share sheet — nothing else to do */ }
+  // Phones & tablets (incl. iPadOS, which reports itself as a Mac but has touch)
+  const IS_MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+                    (navigator.platform==='MacIntel' && navigator.maxTouchPoints > 1);
+
+  // Direct download to the computer (Downloads folder). A blob: URL is used
+  // instead of the huge data: URL so large exports download reliably.
+  function downloadFile(file, dataUrl, filename){
+    try{
+      const url = file ? URL.createObjectURL(file) : dataUrl;
+      const a = document.createElement('a');
+      a.href = url; a.download = filename; a.rel = 'noopener';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      if(file) setTimeout(()=>URL.revokeObjectURL(url), 60000);
+      return true;
+    }catch(err){
+      window.open(dataUrl, '_blank'); // last resort: open it so it can be saved manually
+      return false;
+    }
+  }
+
+  // EXPORT = save the image to this device.
+  //  • Computer: downloads the file straight away (no share menu).
+  //  • iPhone / iPad: iOS can only put images into the Photos app via the
+  //    system sheet, so that sheet is opened — tap "Save Image" there.
+  async function saveImage(dataUrl, filename){
+    const file = await dataUrlToFile(dataUrl, filename);
+    if(IS_MOBILE && file && navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({ files:[file] }); }catch(err){ /* cancelled */ }
       return;
     }
+    downloadFile(file, dataUrl, filename);
+  }
 
-    try{
-      const a = document.createElement('a');
-      a.href = dataUrl;
-      a.download = filename;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }catch(err){
-      window.open(dataUrl, '_blank');
+  // SHARE = system share menu (AirDrop, Messages, LINE…); falls back to a
+  // download where the browser can't share files.
+  async function shareImage(dataUrl, filename){
+    const file = await dataUrlToFile(dataUrl, filename);
+    if(file && navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({ files:[file], title:"N'CARD Pre-Grade Result" }); }catch(err){ /* cancelled */ }
+      return;
     }
+    downloadFile(file, dataUrl, filename);
   }
 
   exportBtn.addEventListener('click', ()=>{
@@ -2124,7 +2151,7 @@
       shareBtn.disabled = false;
 
       setStatus('s.exporting');
-      saveOrShareImage(finalUrl, 'ncard-pregrade-result.jpg').then(()=>{
+      saveImage(finalUrl, 'ncard-pregrade-result.jpg').then(()=>{
         setStatus('s.exported');
       });
     }
@@ -2134,7 +2161,7 @@
 
   shareBtn.addEventListener('click', ()=>{
     if(!window._exportUrl) return;
-    saveOrShareImage(window._exportUrl, 'ncard-pregrade-result.jpg');
+    shareImage(window._exportUrl, 'ncard-pregrade-result.jpg');
   });
 
   // ---------- Reset ----------
